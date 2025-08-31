@@ -12,30 +12,43 @@
 #include <thread>
 
 namespace fs = std::filesystem; // module path alias
-constexpr int PORT = 80;
+constexpr int PORT = 8081;
 
 int main(int argc, char **argv) {
   std::signal(SIGPIPE, SIG_IGN);
   fs::path webroot = fs::current_path();
   if (argc > 1)
     webroot = fs::path(argv[1]);
-  webroot = fs::weakly_canonical(webroot);
+  webroot = fs::weakly_canonical(webroot / "public");
 
-  Fd server{::socket(AF_INET, SOCK_STREAM, 0)};
+  // Create IPv6 TCP socket...
+  Fd server{::socket(AF_INET6, SOCK_STREAM, 0)};
   if (server < 0) {
     perror("socket() failed");
     return 1;
   }
 
-  int yes = 1;
-  ::setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+  // Enable dual-stack (IPv4 + IPv6) on Linux by disabling "IPv6 Only"
+  int no = 0;
+  if (::setsockopt(server, IPPROTO_IPV6, IPV6_V6ONLY, &no, sizeof(no)) < 0) {
+    perror("setsockopt IPV6_V6ONLY failed");
+    return 1;
+  }
   
-  sockaddr_in addr{};
-  addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = INADDR_ANY;
-  addr.sin_port = htons(PORT);
+  // Set reuse socket...
+  int yes = 1;
+  if (::setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
+    perror("setsockopt SO_REUSEADDR failed");
+    return 1;
+  }
+  
+  // Prepare IPv6 address structure and bind it to the socket
+  sockaddr_in6 addr6{};
+  addr6.sin6_family = AF_INET6;
+  addr6.sin6_addr = in6addr_any;  // :: (all interfaces)
+  addr6.sin6_port = htons(PORT);
 
-  if (::bind(server, (sockaddr*)&addr, sizeof(addr)) < 0) {
+  if (::bind(server, (sockaddr*)&addr6, sizeof(addr6)) < 0) {
     perror("bind() failed");
     return 1;
   }

@@ -1,7 +1,7 @@
-#include <sys/stat.h>
 #include <filesystem>
 #include <map>
 #include <string>
+#include <sys/stat.h>
 
 namespace fs = std::filesystem; // module path alias
 
@@ -9,7 +9,8 @@ namespace fs = std::filesystem; // module path alias
 std::string mime_from_ext(std::string_view ext) {
   static const std::map<std::string, std::string, std::less<>> table{
       {"html", "text/html"}, {"htm", "text/html"},   {"txt", "text/plain"},
-      {"jpg", "image/jpeg"}, {"jpeg", "image/jpeg"}, {"png", "image/png"}};
+      {"jpg", "image/jpeg"}, {"jpeg", "image/jpeg"}, {"png", "image/png"},
+      {"css", "text/css"}};
   if (auto it = table.find(std::string(ext)); it != table.end())
     return it->second;
   return "application/octet-stream";
@@ -37,11 +38,13 @@ std::string url_decode(std::string_view s) {
   out.reserve(s.size());
   for (size_t i = 0; i < s.size(); ++i) {
     if (s[i] == '%' && i + 2 < s.size() &&
-        std::isxdigit((unsigned char)s[i+1]) &&
-        std::isxdigit((unsigned char)s[i+2])) {
+        std::isxdigit((unsigned char)s[i + 1]) &&
+        std::isxdigit((unsigned char)s[i + 2])) {
       // convert two hex digits
-      int hi = std::isdigit(s[i+1]) ? s[i+1] - '0' : std::tolower(s[i+1]) - 'a' + 10;
-      int lo = std::isdigit(s[i+2]) ? s[i+2] - '0' : std::tolower(s[i+2]) - 'a' + 10;
+      int hi = std::isdigit(s[i + 1]) ? s[i + 1] - '0'
+                                      : std::tolower(s[i + 1]) - 'a' + 10;
+      int lo = std::isdigit(s[i + 2]) ? s[i + 2] - '0'
+                                      : std::tolower(s[i + 2]) - 'a' + 10;
       out.push_back(char((hi << 4) | lo));
       i += 2; // skip both hex chars
     } else {
@@ -50,4 +53,3 @@ std::string url_decode(std::string_view s) {
   }
   return out;
 }
-
