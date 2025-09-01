@@ -3,14 +3,18 @@
 #include "../include/response.hpp"
 #include "../include/utils.hpp"
 #include <array>
-#include <csignal>
 #include <cstdio>
+#include <cstring>
 #include <fcntl.h>
 #include <filesystem>
 #include <iostream>
 #include <regex>
 #include <string>
 #include <sys/socket.h>
+
+#define LOG_ERR(msg)                                                           \
+  std::cerr << "[" << __FILE__ << ": " << __LINE__ << "]" << msg << ": "       \
+            << strerror(errno) << '\n';
 
 namespace fs = std::filesystem;
 
@@ -68,6 +72,7 @@ void handle_request(int client_fd, const fs::path &webroot) {
                              : fs::path(path);
     fs::path resolved = fs::weakly_canonical(webroot / requested);
     if (resolved.string().rfind(webroot.string(), 0) != 0) {
+      LOG_ERR("Path does not begin with webroot...");
       respond_404(client);
       if (client_wants_close)
         return;
@@ -88,7 +93,7 @@ void handle_request(int client_fd, const fs::path &webroot) {
         // Send static content
         int fd = ::open(resolved.c_str(), O_RDONLY);
         if (fd < 0) {
-          perror("open() failed");
+          LOG_ERR("open() failed");
           respond_404(client);
           if (client_wants_close)
             return;
@@ -98,6 +103,7 @@ void handle_request(int client_fd, const fs::path &webroot) {
         Fd file{fd};
         off_t size = file_size_of(file);
         if (size < 0) {
+          LOG_ERR("file_size_of() failed");
           respond_404(client);
           if (client_wants_close)
             return;
@@ -105,11 +111,26 @@ void handle_request(int client_fd, const fs::path &webroot) {
             continue;
         }
         std::string mime = mime_from_ext(ext_of(resolved));
-        std::string header = "HTTP/1.1 200 OK\r\nContent-Type: " + mime +
+        std::string accessToken =
+            "placeholder"; // just to desmonstrate use of cookies
+                           // and CSRF measures (SameSite=Strict)
+        std::string refreshToken = "placeholder";
+        std::string header = "HTTP/1.1 200 OK"
+                             "\r\nContent-Type: " +
+                             mime +
                              "\r\nContent-Length: " + std::to_string(size) +
-                             "\r\nConnection: keep-alive\r\n\r\n";
-        if (!send_all(client, header))
+                             "\r\nConnection: keep-alive"
+                             "\r\nSet-Cookie: accessToken=" +
+                             accessToken +
+                             "; HttpOnly; SameSite=Strict; Path=/"
+                             "\r\nSet-Cookie: refreshToken=" +
+                             refreshToken +
+                             "; HttpOnly; SameSite=Strict; Path=/"
+                             "\r\n\r\n";
+        if (!send_all(client, header)) {
+          LOG_ERR("send_all() failed");
           return;
+        }
         send_file(client, file);
 
         // Store leftovers...
@@ -149,8 +170,8 @@ void handle_request(int client_fd, const fs::path &webroot) {
       fs::path parent = resolved.parent_path();
       std::error_code ec;
       if (!fs::exists(parent) && !fs::create_directories(parent, ec)) {
-        std::cerr << "Failed to create directories: " << parent << " ("
-                  << ec.message() << ")\n";
+        LOG_ERR("Failed to create directories: ");
+        std::cerr << parent << " (" << ec.message() << ")\n";
         respond_404(client);
         if (client_wants_close)
           return;
@@ -160,7 +181,7 @@ void handle_request(int client_fd, const fs::path &webroot) {
 
       int fd = ::open(resolved.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
       if (fd < 0) {
-        perror("open() failed");
+        LOG_ERR("open() failed");
         respond_404(client);
         if (client_wants_close)
           return;
@@ -170,7 +191,14 @@ void handle_request(int client_fd, const fs::path &webroot) {
       Fd file{fd};
       ::write(file, body.data(), body.size());
 
-      send_all(client, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK");
+      if (!send_all(client, "HTTP/1.1 200 OK\r\nContent-Length: 2"
+                            "\r\nAccess-Control-Allow-Origin: bmac678.ca"
+                            "\r\n\r\nOK")) {
+
+        LOG_ERR("send_all() failed"); // likely some network error, should close
+                                      // connection immediately...
+        return;
+      }
 
       // Store leftovers...
       size_t body_end = request.size();
@@ -190,8 +218,8 @@ void handle_request(int client_fd, const fs::path &webroot) {
       }
 
       if (ec) {
-        std::cerr << "Failed to delete: " << resolved << " -> " << ec.message()
-                  << '\n';
+        LOG_ERR("Failed to delete: ");
+        std::cerr << resolved << " -> " << ec.message() << '\n';
         respond_404(client);
         if (client_wants_close)
           return;
@@ -199,7 +227,12 @@ void handle_request(int client_fd, const fs::path &webroot) {
           continue;
       }
 
-      send_all(client, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK");
+      if (!send_all(client, "HTTP/1.1 200 OK\r\nContent-Length: 2"
+                            "\r\nAccess-Control-Allow-Origin: bmac678.ca"
+                            "\r\n\r\nOK")) {
+        LOG_ERR("send_all() failed");
+        return;
+      }
     } else
       respond_404(client);
 

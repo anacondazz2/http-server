@@ -1,15 +1,15 @@
-#include "../include/request.hpp"
 #include "../include/fd.hpp"
+#include "../include/request.hpp"
 #include <arpa/inet.h>
+#include <csignal>
 #include <fcntl.h>
+#include <filesystem>
+#include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <unistd.h>
-#include <filesystem>
-#include <csignal>
-#include <iostream>
 #include <thread>
+#include <unistd.h>
 
 namespace fs = std::filesystem; // module path alias
 constexpr int PORT = 8081;
@@ -34,40 +34,41 @@ int main(int argc, char **argv) {
     perror("setsockopt IPV6_V6ONLY failed");
     return 1;
   }
-  
+
   // Set reuse socket...
   int yes = 1;
   if (::setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
     perror("setsockopt SO_REUSEADDR failed");
     return 1;
   }
-  
+
   // Prepare IPv6 address structure and bind it to the socket
   sockaddr_in6 addr6{};
   addr6.sin6_family = AF_INET6;
-  addr6.sin6_addr = in6addr_any;  // [::1] (loopback), fe08:: (local), 2000:: (public)
+  addr6.sin6_addr =
+      in6addr_any; // [::1] (loopback), fe08:: (local), 2000:: (public)
   addr6.sin6_port = htons(PORT);
 
-  if (::bind(server, (sockaddr*)&addr6, sizeof(addr6)) < 0) {
+  if (::bind(server, (sockaddr *)&addr6, sizeof(addr6)) < 0) {
     perror("bind() failed");
     return 1;
   }
-  if (::listen(server, 128) < 0) {
+  if (::listen(server, 64) < 0) {
     perror("listen() failed");
     return 1;
   }
 
   std::cout << "Serving " << webroot << " on port " << PORT << '\n';
 
-  while(true) {
+  while (true) {
     sockaddr_in caddr{};
     socklen_t clen = sizeof(caddr);
-    int cfd = ::accept(server, (sockaddr*)&caddr, &clen);
+    int cfd = ::accept(server, (sockaddr *)&caddr, &clen);
     if (cfd < 0) {
       perror("accept() failed");
       continue;
     }
-    std::thread([cfd, webroot] {handle_request(cfd, webroot); }).detach();
+    std::thread([cfd, webroot] { handle_request(cfd, webroot); }).detach();
   }
 
   return 0;
