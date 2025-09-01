@@ -1,27 +1,41 @@
-<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>Minimal Web Server</title>
+    <title>http server</title>
     <link rel="stylesheet" href="styles.css">
     <script src="script.js" defer></script>
   </head>
   <body>
     <div class="container">
-      <h1>My Web Server</h1>
+      <h1>Anacondazz2's Web Server</h1>
 
       <img src="https://picsum.photos/200/300" alt="Random Image">
 
+      <!-- POST request -->
       <form id="postForm">
-        <input type="text" name="filename" placeholder="Filename (e.g., test.txt)" required>
-        <textarea name="body" placeholder="File content" required></textarea>
-        <button type="submit">Send POST</button>
+        <input type="text" name="filename" placeholder="Filename (e.g., test.txt)" required><br>
+        <textarea name="body" placeholder="File content" required></textarea><br>
+        <button type="submit">Send POST Request</button>
       </form>
 
       <div class="response-section">
         <strong>Response:</strong>
-        <div id="response"></div>
+        <div id="responsePost"></div>
       </div>
+      <br>
+
+      <!-- DELETE request -->
+      <form id="deleteForm">
+        <input type="text" name="filename" placeholder="Filename (e.g., test.txt)" required><br><br>
+        <button type="submit">Send DELETE Request</button>
+      </form>
+
+      <div class="response-section">
+        <strong>Response:</strong>
+        <div id="responseDelete"></div>
+      </div>
+      <br>
+
     </div>
   </body>
 </html>

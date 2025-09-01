@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
   // Prepare IPv6 address structure and bind it to the socket
   sockaddr_in6 addr6{};
   addr6.sin6_family = AF_INET6;
-  addr6.sin6_addr = in6addr_any;  // :: (all interfaces)
+  addr6.sin6_addr = in6addr_any;  // [::1] (loopback), fe08:: (local), 2000:: (public)
   addr6.sin6_port = htons(PORT);
 
   if (::bind(server, (sockaddr*)&addr6, sizeof(addr6)) < 0) {

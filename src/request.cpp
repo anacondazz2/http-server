@@ -1,11 +1,13 @@
+#include "../include/request.hpp"
 #include "../include/fd.hpp"
 #include "../include/response.hpp"
 #include "../include/utils.hpp"
 #include <array>
+#include <csignal>
 #include <cstdio>
 #include <fcntl.h>
 #include <filesystem>
-#include <pthread.h>
+#include <iostream>
 #include <regex>
 #include <string>
 #include <sys/socket.h>
@@ -37,12 +39,23 @@ void handle_request(int client_fd, const fs::path &webroot) {
       }
     }
 
+    // Check if client wants close...
+    bool client_wants_close = false;
+    if (std::regex_search(request, std::regex("Connection: close",
+                                              std::regex_constants::icase))) {
+      client_wants_close = true;
+    }
+
     // Extract the method and path from headers.
     std::string_view req(request);
     static const std::regex r("^(GET|POST|PUT|DELETE) ([^ ]*) HTTP/1\\.[01]");
     std::cmatch m;
     if (!std::regex_search(req.begin(), req.begin() + header_end, m, r)) {
       respond_404(client);
+      if (client_wants_close)
+        return;
+      else
+        continue;
     }
     std::string method = m[1].str();
     std::string path = url_decode(m[2].str());
@@ -56,67 +69,40 @@ void handle_request(int client_fd, const fs::path &webroot) {
     fs::path resolved = fs::weakly_canonical(webroot / requested);
     if (resolved.string().rfind(webroot.string(), 0) != 0) {
       respond_404(client);
+      if (client_wants_close)
+        return;
+      else
+        continue;
     }
 
-    // printf("Requested path: %s\n", path.c_str());
-    // printf("Resolved path: %s\n", resolved.c_str());
-
-    // Check if client wants close...
-    bool client_wants_close = false;
-    if (std::regex_search(request, std::regex("Connection: close",
-                                              std::regex_constants::icase))) {
-      client_wants_close = true;
-    }
+    // printf("webroot: %s\n", webroot.c_str());
+    // printf("requested: %s\n", requested.c_str());
+    // printf("resolved: %s\n\n", resolved.c_str());
 
     // Dispatch HTTP request based on method...
     // --- GET ---
     if (method == "GET") {
-      // Directory listing
       if (fs::is_directory(resolved)) {
-        std::string listing =
-            "<!DOCTYPE html><html><head><title>Index of " + path +
-            "</title>"
-            "<style>body{font-family:monospace;}a{text-decoration:none;color:#"
-            "000;}a:hover{text-decoration:underline;}ul{list-style:none;"
-            "padding-"
-            "left:0;}li{margin:0.25rem 0;}</style>"
-            "</head><body class=\"dir-listing\">"
-            "<h1>Index of " +
-            path + "</h1><ul>";
-
-        if (path != "/") {
-          fs::path parent = fs::path(path).parent_path();
-          listing += "<li><a href=\"" + parent.string();
-          listing +=
-              (parent.string() == "/") ? "\">..</a></li>" : "/\">..</a></li>";
-        }
-
-        for (auto &entry : fs::directory_iterator(resolved)) {
-          std::string name = entry.path().filename().string();
-          std::string href = path;
-          if (!href.ends_with('/'))
-            href += '/';
-          href += name;
-          listing += "<li><a href=\"" + href + "\">" + name + "</a></li>";
-        }
-
-        listing += "</ul></body></html>";
-        std::string header =
-            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " +
-            std::to_string(listing.size()) +
-            "\r\nConnection: keep-alive\r\n\r\n";
-        send_all(client, header);
-        send_all(client, listing);
+        handle_dir(client, path, resolved);
       } else {
         // Send static content
         int fd = ::open(resolved.c_str(), O_RDONLY);
         if (fd < 0) {
+          perror("open() failed");
           respond_404(client);
+          if (client_wants_close)
+            return;
+          else
+            continue;
         }
         Fd file{fd};
         off_t size = file_size_of(file);
         if (size < 0) {
           respond_404(client);
+          if (client_wants_close)
+            return;
+          else
+            continue;
         }
         std::string mime = mime_from_ext(ext_of(resolved));
         std::string header = "HTTP/1.1 200 OK\r\nContent-Type: " + mime +
@@ -152,9 +138,34 @@ void handle_request(int client_fd, const fs::path &webroot) {
         body_have = request.size() - header_end;
       }
       std::string body = request.substr(header_end, content_length);
+
+      // Only allow changes to webroot/anacondazz2
+      // Note that directory traversal attack (..) would not reach here
+      // as sanitization above backs out early.
+      resolved = fs::weakly_canonical(webroot / "anacondazz2" / requested);
+      // printf("Resolved path: %s\n", resolved.c_str());
+
+      // Create parent directories if neeeded
+      fs::path parent = resolved.parent_path();
+      std::error_code ec;
+      if (!fs::exists(parent) && !fs::create_directories(parent, ec)) {
+        std::cerr << "Failed to create directories: " << parent << " ("
+                  << ec.message() << ")\n";
+        respond_404(client);
+        if (client_wants_close)
+          return;
+        else
+          continue;
+      }
+
       int fd = ::open(resolved.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
       if (fd < 0) {
+        perror("open() failed");
         respond_404(client);
+        if (client_wants_close)
+          return;
+        else
+          continue;
       }
       Fd file{fd};
       ::write(file, body.data(), body.size());
@@ -169,15 +180,31 @@ void handle_request(int client_fd, const fs::path &webroot) {
     }
     // --- DELETE ---
     else if (method == "DELETE") {
-      if (::unlink(resolved.c_str()) != 0) {
-        respond_404(client);
+      // Only allow changes to webroot/anacondazz2
+      resolved = fs::weakly_canonical(webroot / "anacondazz2" / requested);
+      std::error_code ec;
+      if (fs::is_directory(resolved, ec)) {
+        fs::remove_all(resolved, ec); // recursively delete directory
       } else {
-        send_all(client, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK");
+        fs::remove(resolved, ec); // just delete the file
       }
+
+      if (ec) {
+        std::cerr << "Failed to delete: " << resolved << " -> " << ec.message()
+                  << '\n';
+        respond_404(client);
+        if (client_wants_close)
+          return;
+        else
+          continue;
+      }
+
+      send_all(client, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK");
     } else
       respond_404(client);
 
     if (client_wants_close)
-      return; // else, continue to next request...
+      return; // else, continue to
+              // next request...
   }
 }

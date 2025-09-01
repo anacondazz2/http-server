@@ -7,6 +7,9 @@ namespace fs = std::filesystem; // module path alias
 
 // Extract mime from extension 'ext'.
 std::string mime_from_ext(std::string_view ext) {
+  if (ext.empty())
+    return "text/plain";
+
   static const std::map<std::string, std::string, std::less<>> table{
       {"html", "text/html"}, {"htm", "text/html"},   {"txt", "text/plain"},
       {"jpg", "image/jpeg"}, {"jpeg", "image/jpeg"}, {"png", "image/png"},
