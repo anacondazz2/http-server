@@ -1,16 +1,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>bmac678</title>
+    <title>Http Server</title>
     <link rel="stylesheet" href="styles.css">
     <script src="script.js" defer></script>
   </head>
   <body>
     <div class="container">
-      <h1>Patrick's Web Server</h1>
+      <h1>Yet Another Web Server</h1>
 
-      <img src="https://picsum.photos/200/300" alt="Random Image">
+      <video width="640" height="360" controls>
+        <source src="media/fat-bee.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
       <br><br><br>
+
+      <!--
+      <img src="media/qionghai.jpg" width="400px">
+      <br><br><br>
+      -->
 
       <!-- POST request -->
       <form id="postForm">
@@ -35,7 +43,9 @@
         <strong>Response:</strong>
         <div id="responseDelete"></div>
       </div>
-      <br>
+      <br><br><br>
+
+      <button id="browseButton">Browse</button>
 
     </div>
   </body>

@@ -39,5 +39,9 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("responseDelete").textContent = "Error sending DELETE";
     }
   });
-});
 
+  const browseButton = document.getElementById("browseButton");
+  browseButton.addEventListener("click", async (e) => {
+    window.location.href = "/anacondazz2";
+  });  
+});

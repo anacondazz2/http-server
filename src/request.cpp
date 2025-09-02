@@ -13,7 +13,7 @@
 #include <sys/socket.h>
 
 #define LOG_ERR(msg)                                                           \
-  std::cerr << "[" << __FILE__ << ": " << __LINE__ << "]" << msg << ": "       \
+  std::cerr << "[" << __FILE__ << ": " << __LINE__ << "] " << msg << ": "       \
             << strerror(errno) << '\n';
 
 namespace fs = std::filesystem;

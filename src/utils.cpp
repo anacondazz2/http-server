@@ -13,7 +13,7 @@ std::string mime_from_ext(std::string_view ext) {
   static const std::map<std::string, std::string, std::less<>> table{
       {"html", "text/html"}, {"htm", "text/html"},   {"txt", "text/plain"},
       {"jpg", "image/jpeg"}, {"jpeg", "image/jpeg"}, {"png", "image/png"},
-      {"css", "text/css"}};
+      {"css", "text/css"}, {"mov", "video/quicktime"}, {"mp4", "video/mp4"}};
   if (auto it = table.find(std::string(ext)); it != table.end())
     return it->second;
   return "application/octet-stream";
