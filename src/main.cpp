@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     webroot = fs::path(argv[1]);
   webroot = fs::weakly_canonical(webroot / "public");
 
-  // Create IPv6 TCP socket...
+  // Create IPv6 TCP socket
   Fd server{::socket(AF_INET6, SOCK_STREAM, 0)};
   if (server < 0) {
     perror("socket() failed");
@@ -31,11 +31,10 @@ int main(int argc, char **argv) {
   // Enable dual-stack (IPv4 + IPv6) on Linux by disabling "IPv6 Only"
   int no = 0;
   if (::setsockopt(server, IPPROTO_IPV6, IPV6_V6ONLY, &no, sizeof(no)) < 0) {
-    perror("setsockopt IPV6_V6ONLY failed");
     return 1;
   }
 
-  // Set reuse socket...
+  // Make socket "resusable"; allows quickly restarting server on same port
   int yes = 1;
   if (::setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
     perror("setsockopt SO_REUSEADDR failed");

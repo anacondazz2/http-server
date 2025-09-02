@@ -43,7 +43,7 @@ std::string url_decode(std::string_view s) {
     if (s[i] == '%' && i + 2 < s.size() &&
         std::isxdigit((unsigned char)s[i + 1]) &&
         std::isxdigit((unsigned char)s[i + 2])) {
-      // convert two hex digits
+      // Convert two hex digits
       int hi = std::isdigit(s[i + 1]) ? s[i + 1] - '0'
                                       : std::tolower(s[i + 1]) - 'a' + 10;
       int lo = std::isdigit(s[i + 2]) ? s[i + 2] - '0'

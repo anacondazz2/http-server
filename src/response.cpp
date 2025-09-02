@@ -1,11 +1,11 @@
 #include <arpa/inet.h>
+#include <array>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <string_view>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <array>
-#include <string_view>
 
 constexpr int CHUNK = 64 * 1024;
 
@@ -28,7 +28,7 @@ bool send_all(int sock, std::string_view s) {
 // Send the file 'file_fd' to socket 'sock'.
 void send_file(int sock, int file_fd) {
   std::array<char, CHUNK> buf{};
-  // Send 'CHUNK' number of bytes of the file at a time.
+  // Send 'CHUNK' number of bytes of the file at a time
   while (true) {
     // Wrap the read() in a while(1) in case all buf.size() bytes are not read
     // in one go

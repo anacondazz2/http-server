@@ -13,7 +13,7 @@
 #include <sys/socket.h>
 
 #define LOG_ERR(msg)                                                           \
-  std::cerr << "[" << __FILE__ << ": " << __LINE__ << "] " << msg << ": "       \
+  std::cerr << "[" << __FILE__ << ": " << __LINE__ << "] " << msg << ": "      \
             << strerror(errno) << '\n';
 
 namespace fs = std::filesystem;
@@ -23,13 +23,13 @@ void handle_request(int client_fd, const fs::path &webroot) {
   std::array<char, 4096> buf{};
   std::string leftover;
 
-  // Assume connection: keep-alive unless client says otherwise...
+  // Assume connection: keep-alive unless client says otherwise
   while (true) {
     std::string request = leftover;
     size_t header_end = std::string::npos;
 
     // Read until end of headers.
-    // Reads in 4KB chunks, technically no limit on request size...
+    // Reads in 4KB chunks; so no limit on request size
     while (true) {
       ssize_t got = ::recv(client, buf.data(), buf.size(), 0);
       if (got <= 0)
@@ -43,14 +43,14 @@ void handle_request(int client_fd, const fs::path &webroot) {
       }
     }
 
-    // Check if client wants close...
+    // Check if client wants close
     bool client_wants_close = false;
     if (std::regex_search(request, std::regex("Connection: close",
                                               std::regex_constants::icase))) {
       client_wants_close = true;
     }
 
-    // Extract the method and path from headers.
+    // Extract the method and path from headers
     std::string_view req(request);
     static const std::regex r("^(GET|POST|PUT|DELETE) ([^ ]*) HTTP/1\\.[01]");
     std::cmatch m;
@@ -66,7 +66,7 @@ void handle_request(int client_fd, const fs::path &webroot) {
     if (path.empty() || path == "/")
       path = "/index.html";
 
-    // Sanitize path...
+    // Sanitize path
     fs::path requested = fs::path(path).is_absolute()
                              ? fs::path(path).relative_path()
                              : fs::path(path);
@@ -84,7 +84,7 @@ void handle_request(int client_fd, const fs::path &webroot) {
     // printf("requested: %s\n", requested.c_str());
     // printf("resolved: %s\n\n", resolved.c_str());
 
-    // Dispatch HTTP request based on method...
+    // Dispatch HTTP request based on method
     // --- GET ---
     if (method == "GET") {
       if (fs::is_directory(resolved)) {
@@ -133,14 +133,14 @@ void handle_request(int client_fd, const fs::path &webroot) {
         }
         send_file(client, file);
 
-        // Store leftovers...
+        // Store leftovers
         size_t request_end = request.size();
         leftover = (request_end > header_end) ? request.substr(header_end) : "";
       }
     }
     // --- POST / PUT ---
     else if (method == "POST" || method == "PUT") {
-      // Parse content length...
+      // Parse content length
       std::smatch cl_match;
       size_t content_length = 0;
       if (std::regex_search(request, cl_match,
@@ -149,7 +149,7 @@ void handle_request(int client_fd, const fs::path &webroot) {
         content_length = std::stoul(cl_match[1]);
       }
 
-      // Read remaining body if needed...
+      // Read remaining body if needed
       size_t body_have = request.size() - header_end;
       while (body_have < content_length) {
         ssize_t got = ::recv(client, buf.data(), buf.size(), 0);
@@ -200,7 +200,7 @@ void handle_request(int client_fd, const fs::path &webroot) {
         return;
       }
 
-      // Store leftovers...
+      // Store leftovers
       size_t body_end = request.size();
       leftover = (body_end > (header_end + content_length))
                      ? request.substr(header_end + content_length)
@@ -211,7 +211,9 @@ void handle_request(int client_fd, const fs::path &webroot) {
       // Only allow changes to webroot/anacondazz2
       resolved = fs::weakly_canonical(webroot / "anacondazz2" / requested);
       std::error_code ec;
-      if (fs::is_directory(resolved, ec)) {
+      if (!fs::exists(resolved, ec)) {
+        ec = std::make_error_code(std::errc::no_such_file_or_directory);
+      } else if (fs::is_directory(resolved, ec)) {
         fs::remove_all(resolved, ec); // recursively delete directory
       } else {
         fs::remove(resolved, ec); // just delete the file
