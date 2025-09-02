@@ -15,10 +15,16 @@ RUN cmake -B ./build -S . && cmake --build ./build
 # Stage 2
 FROM debian:stable-slim
 
+RUN groupadd -r dummyuser && useradd -r -g dummyuser dummyuser
+
 WORKDIR /server
 
 COPY --from=builder /server/build/http-server .
 COPY --from=builder /server/public ./public
+
+RUN chown -R dummyuser:dummyuser /server
+
+USER dummyuser
 
 EXPOSE 8081
 

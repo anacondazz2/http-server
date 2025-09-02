@@ -1,0 +1,5 @@
+build/
+.cache/
+.other/
+public/anacondazz2/
+stress-test.py

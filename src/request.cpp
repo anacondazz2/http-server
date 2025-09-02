@@ -13,7 +13,7 @@
 #include <sys/socket.h>
 
 #define LOG_ERR(msg)                                                           \
-  std::cerr << "[" << __FILE__ << ": " << __LINE__ << "] " << msg << ": "       \
+  std::cerr << "[" << __FILE__ << ": " << __LINE__ << "] " << msg << ": "      \
             << strerror(errno) << '\n';
 
 namespace fs = std::filesystem;
@@ -211,7 +211,9 @@ void handle_request(int client_fd, const fs::path &webroot) {
       // Only allow changes to webroot/anacondazz2
       resolved = fs::weakly_canonical(webroot / "anacondazz2" / requested);
       std::error_code ec;
-      if (fs::is_directory(resolved, ec)) {
+      if (!fs::exists(resolved, ec)) {
+        ec = std::make_error_code(std::errc::no_such_file_or_directory);
+      } else if (fs::is_directory(resolved, ec)) {
         fs::remove_all(resolved, ec); // recursively delete directory
       } else {
         fs::remove(resolved, ec); // just delete the file
